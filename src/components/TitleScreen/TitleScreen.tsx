@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useGameStore } from '../../game/useGameStore'
 import { LANE_KEYS, NOTE_SPEED_LEVELS } from '../../game/constants'
@@ -43,7 +43,8 @@ export const AVAILABLE_SONGS: SongMetadata[] = [
         duration: '0:30',
         bpm: 150, // 150 BPM으로 수정
         difficulty: 3,
-        url: '/music/Starlight_Serenade.mp3'
+        url: '/music/Starlight_Serenade.mp3',
+        offset: 0.05 // +50ms 오프셋
     }
 ]
 
@@ -53,6 +54,11 @@ export function TitleScreen() {
     const [isLoading, setIsLoading] = useState(false)
 
     const selectedSong = AVAILABLE_SONGS[selectedSongIdx]
+
+    // 초기 마운트 시 기본 선택된 곡의 오프셋을 게임 스토어에 동기화
+    useEffect(() => {
+        setAudioOffset(AVAILABLE_SONGS[selectedSongIdx].offset ?? 0)
+    }, [])
 
     const startGame = useCallback(async () => {
         if (isLoading) return
