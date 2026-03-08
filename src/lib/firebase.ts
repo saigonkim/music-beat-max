@@ -2,12 +2,12 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
 
 const firebaseConfig = {
-    apiKey: "AIzaSyCvnqonvoP_vVjiDmEZ1ZE-ZJe6teuarzY",
-    authDomain: "musicbeatmax-plab-dev.firebaseapp.com",
-    projectId: "musicbeatmax-plab-dev",
-    storageBucket: "musicbeatmax-plab-dev.firebasestorage.app",
-    messagingSenderId: "954250905531",
-    appId: "1:954250905531:web:f759e4c581a2d80f5ce69e"
+    apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+    appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
 const app = initializeApp(firebaseConfig);
