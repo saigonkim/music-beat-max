@@ -1,0 +1,109 @@
+# MusicBeatMax — Task List (TASKS.md)
+
+> TDD(테스트 주도 개발) 접근 방식 | 각 Phase는 독립적으로 검증 가능
+
+---
+
+## Phase 0: 프로젝트 기반 세팅
+
+- [ ] **T0-1** `npm create vite@latest musicbeatmax -- --template react-ts` 실행
+- [ ] **T0-2** Tailwind CSS v3 설치 및 `tailwind.config.ts` 커스텀 색상 토큰 추가
+  - 레인 색상, 판정선 glow, 배경색 등 PRD 4절 디자인 토큰 반영
+- [ ] **T0-3** framer-motion, zustand 의존성 설치
+- [ ] **T0-4** Google Fonts (Space Grotesk) 로드, `index.css` 글로벌 스타일 정의
+- [ ] **T0-5** `src/` 디렉토리 구조 (ARCHITECTURE 2절) 생성 및 빈 파일 scaffolding
+- [ ] **T0-6** ESLint + Prettier 설정
+- [ ] **T0-7** Vitest + @testing-library/react 설치 및 기본 테스트 실행 확인
+
+**검증:** `npm run dev` → 빈 화면 정상 로드, `npm run test` → 0 failures
+
+---
+
+## Phase 1: Stitch UI 스캐폴딩 — 타이틀 화면
+
+- [ ] **T1-1** `TitleScreen.tsx` 구현 — Stitch 디자인(`c88b96eb...`) 기반 레이아웃
+- [ ] **T1-2** `SongCard.tsx` — 앨범 아트, 곡 이름, BPM 배지, 별점
+- [ ] **T1-3** `SpeedSlider.tsx` — 1~5단계 슬라이더, 단계별 `noteSpeed` 상태 반영
+- [ ] **T1-4** framer-motion PLAY 버튼 펄스 애니메이션 (`scale: [1, 1.05, 1]`, 468ms)
+- [ ] **T1-5** `GameScreen`으로 라우팅 (React state 기반 `scene` 전환)
+- [ ] **T1-6** 유닛 테스트: `SpeedSlider` 슬라이더 값 1~5 정상 렌더
+
+**검증:** 화면에서 Speed 슬라이더 조작 → PLAY 버튼으로 게임 화면 진입 확인
+
+---
+
+## Phase 2: 4키 레인 UI + framer-motion 노트 낙하
+
+- [ ] **T2-1** `GameScreen.tsx` 레이아웃 — Stitch 디자인(`d6d58ba0...`) 기반
+- [ ] **T2-2** `Lane.tsx` — React.memo 래핑, 레인별 neon 색상
+- [ ] **T2-3** `Note.tsx` — `translateY` CSS transform 기반 낙하, `will-change: transform`
+- [ ] **T2-4** `JudgmentLine.tsx` — 4px 흰색 bar + Tailwind animate-pulse (468.75ms)
+- [ ] **T2-5** `ScorePanel.tsx` — 점수 / 콤보 / 멀티플라이어 표시
+- [ ] **T2-6** Mock 노트 데이터로 낙하 애니메이션 시각 확인 (오디오 없이)
+- [ ] **T2-7** 유닛 테스트: `Lane` 4개 렌더, `Note` props → y 위치 매핑 검증
+
+**검증:** 더미 BPM 데이터로 노트가 레인을 따라 판정선까지 낙하하는 것 확인
+
+---
+
+## Phase 3: Web Audio API — 128 BPM 오디오 동기화
+
+- [ ] **T3-1** `AudioEngine.ts` — `AudioContext`, `decodeAudioData`, `analyserNode` 구현
+- [ ] **T3-2** `BeatAnalyzer.ts` — 128 BPM → 비트 타임스탬프 배열 생성
+- [ ] **T3-3** `useAudioSync.ts` — RAF 루프로 `AudioContext.currentTime` → Zustand `audioTime` 갱신
+- [ ] **T3-4** `noteChart.ts` — 실제 곡 기반 수동/자동 노트 차트 데이터
+- [ ] **T3-5** 노트 `y` 위치 공식 (`AudioEngine` currentTime 기준) 연동
+  ```
+  y = ((audioTime - spawnTime) / noteDropDuration) * LANE_HEIGHT
+  ```
+- [ ] **T3-6** `useGameStore.ts` — Zustand 스토어 `setAudioTime` 액션 구현
+- [ ] **T3-7** 유닛 테스트: `BeatAnalyzer` — 128 BPM, 60초 → 128*60=7680 비트 생성 확인
+- [ ] **T3-8** 통합 테스트: 오디오 재생 5초 후 노트 위치가 기대값 ±5px 이내
+
+**검증:** 실제 EDM 파일 재생 시 노트 낙하가 비트와 시각적으로 동기화됨 확인
+
+---
+
+## Phase 4: FBM 판정 시스템 + 시각 이펙트
+
+- [ ] **T4-1** `useKeyInput.ts` — `keydown` → `pressKey(lane, audioTime)` 바인딩
+  - D→레인0, F→레인1, J→레인2, K→레인3
+- [ ] **T4-2** `JudgeEngine.ts` — `|Δt| ≤ 50ms → PERFECT / ≤150ms → GOOD / else → MISS`
+- [ ] **T4-3** `JudgmentText.tsx` — AnimatePresence + framer-motion 폭발 이펙트
+  - PERFECT: `scale [0.5→1→1.4]`, gold color, 600ms
+  - GOOD: `scale [0.8→1]`, green color
+  - MISS: `opacity [1→0]`, red, 400ms
+- [ ] **T4-4** 레인 플래시 효과 — 키 입력 시 레인 background 0.1s 플래시
+- [ ] **T4-5** `Visualizer.tsx` — AnalyserNode FFT → 막대 그래프, `comboTier`로 강도 제어
+- [ ] **T4-6** `useComboEffect.ts` — combo 10/30/50 구간별 `comboTier` 0→1→2→3 전환
+- [ ] **T4-7** 배경 radial pulse (comboTier=3) — CSS keyframe + framer-motion 레이어
+- [ ] **T4-8** 유닛 테스트: `JudgeEngine` — 경계값 테스트 (49ms→PERFECT, 51ms→GOOD, 151ms→MISS)
+- [ ] **T4-9** 유닛 테스트: `useKeyInput` — D/F/J/K 키 이벤트 → 올바른 레인 매핑
+
+**검증:** 실제 플레이 시 PERFECT 판정 효과, 콤보 10/30/50 단계별 배경 변화 확인
+
+---
+
+## Phase 5: 결과 화면 + 최종 폴리시
+
+- [ ] **T5-1** `ResultScreen.tsx` — 랭크 배지(S/A/B/C/D), 통계 테이블, 그래프
+- [ ] **T5-2** 랭크 애니메이션 — framer-motion scale-up + glow 등장
+- [ ] **T5-3** 카운트다운 화면 (3→2→1→GO!) 구현
+- [ ] **T5-4** 노트 "예고 쉐도우" (낙하 0.5초 전 상단 희미한 미리보기)
+- [ ] **T5-5** 전체 성능 검증 — Chrome DevTools Performance 탭으로 60fps 유지 확인
+- [ ] **T5-6** 오디오 재생 오프셋(Audio Latency) 보정 설정 추가
+- [ ] **T5-7** `npm run build` → 번들 크기 < 300KB 확인 (gzip)
+- [ ] **T5-8** E2E 시나리오: 타이틀 → 게임 → 결과 전체 플로우 수동 검증
+
+**검증:** 전체 게임 플로우 실행, 60fps 유지, 번들 크기 목표치 달성
+
+---
+
+## 작업 우선순위 요약
+
+```
+Phase 0 → Phase 1 → Phase 2 → Phase 3 → Phase 4 → Phase 5
+  (환경)    (타이틀)   (레인UI)   (오디오)   (판정)    (완성)
+```
+
+**각 Phase 완료 조건**: 해당 Phase 유닛 테스트 통과 + 시각적 검증 완료

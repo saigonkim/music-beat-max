@@ -1,0 +1,51 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html,
+  body,
+  #root {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background-color: #06040f;
+    font-family: 'Space Grotesk', sans-serif;
+    color: #ffffff;
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+@layer utilities {
+  /* Neon glow text effects */
+  .text-neon-cyan {
+    text-shadow: 0 0 10px #00f0ff, 0 0 20px #00f0ff, 0 0 40px #00f0ff;
+  }
+  .text-neon-magenta {
+    text-shadow: 0 0 10px #ff2d9b, 0 0 20px #ff2d9b;
+  }
+  .text-neon-gold {
+    text-shadow: 0 0 10px #facc15, 0 0 20px #facc15, 0 0 40px #facc15;
+  }
+  .text-neon-green {
+    text-shadow: 0 0 10px #39ff14, 0 0 20px #39ff14;
+  }
+
+  /* Judgment line glow */
+  .judgment-line {
+    box-shadow: 0 0 20px 6px rgba(255, 255, 255, 0.8), 0 0 40px 12px rgba(255, 255, 255, 0.3);
+    animation: judgment-glow 468.75ms ease-in-out infinite;
+  }
+
+  /* Performance hint: promote to GPU layer */
+  .gpu-layer {
+    will-change: transform;
+    transform: translateZ(0);
+  }
+}

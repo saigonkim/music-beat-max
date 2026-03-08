@@ -1,0 +1,227 @@
+# MusicBeatMax — Architecture Document
+
+> Web Audio API + requestAnimationFrame 기반 128 BPM 동기화 아키텍처
+
+---
+
+## 1. 디렉토리 구조
+
+```
+src/
+├── audio/                  # 오디오 분석부 (Audio Engine)
+│   ├── AudioEngine.ts      # Web Audio API 래퍼, currentTime 공급
+│   ├── BeatAnalyzer.ts     # BPM → 비트 타임스탬프 배열 생성
+│   └── useAudioSync.ts     # RAF 루프, audioTime → 게임 tick 연결
+│
+├── game/                   # 게임 로직부
+│   ├── noteChart.ts        # 노트 차트 데이터 (beatOffset, lane, type)
+│   ├── JudgeEngine.ts      # 판정 로직 (PERFECT/GOOD/MISS 계산)
+│   ├── useGameStore.ts     # Zustand 전역 스토어 (score, combo, notes)
+│   └── constants.ts        # BPM=128, PERFECT_WINDOW=50ms, etc.
+│
+├── components/             # 렌더링부 (React Components)
+│   ├── GameScreen/
+│   │   ├── GameScreen.tsx  # 최상위 게임 화면, RAF 구독
+│   │   ├── Lane.tsx        # 단일 레인 (메모이즈됨)
+│   │   ├── Note.tsx        # 단일 노트 블록 (framer-motion)
+│   │   ├── JudgmentLine.tsx # 판정선 + 펄스 애니메이션
+│   │   ├── JudgmentText.tsx # PERFECT / GOOD / MISS 팝업
+│   │   ├── ScorePanel.tsx  # 점수 + 콤보 표시
+│   │   └── Visualizer.tsx  # 콤보 기반 배경 Audio Visualizer
+│   ├── TitleScreen/
+│   │   ├── TitleScreen.tsx
+│   │   ├── SongCard.tsx
+│   │   └── SpeedSlider.tsx
+│   └── ResultScreen/
+│       └── ResultScreen.tsx
+│
+├── hooks/
+│   ├── useKeyInput.ts      # 이벤트 처리부 - keydown/keyup 바인딩
+│   └── useComboEffect.ts   # 콤보 단계별 이펙트 트리거
+│
+├── assets/
+│   └── audio/edm_drop_zone.mp3
+│
+└── main.tsx
+```
+
+---
+
+## 2. 비트 싱크(Beat Sync) 핵심 아키텍처
+
+### 2-1. 시간 기준 (Single Source of Truth)
+
+```
+AudioContext.currentTime  ──►  GameTick(audioTime)
+        │                           │
+        │   requestAnimationFrame   │
+        └───────────────────────────┘
+
+• setInterval / setTimeout 금지 — 드리프트 발생
+• RAF 콜백마다 AudioContext.currentTime 읽어 게임 시간 갱신
+• 모든 노트 판정: |keyPressTime - note.targetTime| 비교
+```
+
+### 2-2. AudioEngine.ts 핵심 인터페이스
+
+```typescript
+interface AudioEngine {
+  currentTime: number;          // AudioContext.currentTime
+  duration: number;
+  play(): void;
+  pause(): void;
+  analyserNode: AnalyserNode;   // Visualizer용 FFT 데이터
+}
+```
+
+### 2-3. 노트 스케줄링 공식
+
+```typescript
+// 128 BPM: 1박자 = 60/128 = 0.46875초
+const BEAT_DURATION = 60 / BPM;
+
+// 노트 spawnTime: 판정선 도달 시각(targetTime) - 낙하에 걸리는 시간
+const noteDropDuration = NOTE_FALL_DISTANCE / noteSpeed; // px/s
+const spawnTime = note.targetTime - noteDropDuration;
+
+// 렌더링 위치 (RAF 루프마다 계산)
+const elapsed = audioTime - spawnTime;          // 경과 시간
+const y = (elapsed / noteDropDuration) * LANE_HEIGHT; // 0 → LANE_HEIGHT
+```
+
+### 2-4. useAudioSync (RAF 루프)
+
+```typescript
+function useAudioSync(engine: AudioEngine, onTick: (t: number) => void) {
+  useEffect(() => {
+    let rafId: number;
+    const loop = () => {
+      onTick(engine.currentTime);   // 게임 스토어 갱신
+      rafId = requestAnimationFrame(loop);
+    };
+    rafId = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(rafId);
+  }, [engine]);
+}
+```
+
+---
+
+## 3. 상태 관리 (Zustand Store)
+
+```typescript
+interface GameState {
+  // 오디오
+  audioTime: number;
+  isPlaying: boolean;
+
+  // 게임
+  notes: Note[];           // 현재 화면에 존재하는 노트
+  score: number;
+  combo: number;
+  maxCombo: number;
+  judgments: { perfect: number; good: number; miss: number };
+
+  // 설정
+  noteSpeed: number;       // 1~5 단계
+  comboTier: 0 | 1 | 2 | 3; // 이펙트 강도
+
+  // 액션
+  setAudioTime: (t: number) => void;
+  pressKey: (lane: Lane, pressTime: number) => void;
+  spawnNote: (note: Note) => void;
+}
+```
+
+**핵심 원칙:**
+- `audioTime`만 RAF 루프에서 갱신 → 나머지 파생값은 selectors로 계산
+- Note 렌더링 위치는 **store 외부**에서 `audioTime - spawnTime`으로 계산 (store mutation 최소화)
+- `comboTier`는 combo 값의 derived state → Zustand `subscribeWithSelector`로 구독
+
+---
+
+## 4. 렌더링 최적화
+
+| 기법 | 적용 위치 | 효과 |
+|------|-----------|------|
+| `React.memo` | `Lane`, `Note`, `ScorePanel` | 부모 리렌더 시 불필요한 재렌더 방지 |
+| `useMemo` | 노트 위치(`y`) 배열 계산 | audioTime 변화마다 전체 재계산 방지 |
+| `useCallback` | `pressKey` 핸들러 | 이벤트 핸들러 안정적 참조 유지 |
+| CSS Transform | 노트 이동 | `top` 변경 대신 `translateY()` (GPU 가속) |
+| `will-change: transform` | Note 컴포넌트 | 레이어 승격으로 합성 최적화 |
+| Zustand selector | 개별 레인 구독 | 전체 리렌더 방지 |
+
+---
+
+## 5. 컴포넌트 계층도
+
+```
+App
+├── TitleScreen
+│   ├── SongCard
+│   └── SpeedSlider
+├── GameScreen  ← RAF 루프 최상위 구독
+│   ├── Visualizer          (comboTier 구독)
+│   ├── ScorePanel          (score, combo 구독)
+│   ├── Lane ×4             (각 레인 노트만 구독)
+│   │   └── Note ×N         (y 위치, framer-motion)
+│   ├── JudgmentLine        (정적, CSS pulse만)
+│   └── JudgmentText        (마지막 판정 결과 구독)
+└── ResultScreen
+```
+
+---
+
+## 6. 판정 로직 흐름
+
+```
+keydown event
+    │
+    ▼
+useKeyInput.ts: pressKey(lane, AudioContext.currentTime)
+    │
+    ▼
+JudgeEngine.findClosestNote(lane, pressTime, notes)
+    │  → 판정선 기준 ±150ms 이내 노트 탐색
+    ▼
+|Δt| ≤ 50ms  → PERFECT (+300, combo+1)
+|Δt| ≤ 150ms → GOOD    (+100, combo+1)
+else         → MISS     (+0,   combo=0)
+    │
+    ▼
+Zustand store 업데이트 → JudgmentText 렌더 트리거
+```
+
+---
+
+## 7. framer-motion 판정 이펙트 설계
+
+```tsx
+// JudgmentText.tsx
+<AnimatePresence mode="wait">
+  {lastJudgment && (
+    <motion.div
+      key={judgmentKey}          // 동일 판정 연속 시에도 재실행
+      initial={{ scale: 0.5, opacity: 0, y: 20 }}
+      animate={{ scale: 1,   opacity: 1, y: 0  }}
+      exit   {{ scale: 1.4,  opacity: 0, y: -30 }}
+      transition={{ duration: 0.15, exit: { duration: 0.4 } }}
+    >
+      PERFECT!
+    </motion.div>
+  )}
+</AnimatePresence>
+```
+
+---
+
+## 8. 기술 스택 결정 사항
+
+| 항목 | 선택 | 이유 |
+|------|------|------|
+| 번들러 | Vite 5 | HMR 속도, ESM 네이티브 |
+| 상태관리 | Zustand | 최소 보일러플레이트, 외부 구독 지원 |
+| 애니메이션 | framer-motion | AnimatePresence, layout 애니메이션 |
+| 오디오 | Web Audio API (네이티브) | 고정밀 currentTime, AnalyserNode |
+| 스타일 | Tailwind CSS v3 | 유틸리티 퍼스트, 빠른 커스텀 |
+| 타입 | TypeScript strict | 게임 로직 버그 조기 발견 |

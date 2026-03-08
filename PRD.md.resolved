@@ -1,0 +1,120 @@
+# MusicBeatMax — Product Requirements Document (PRD)
+
+> **버전**: 1.0 | **날짜**: 2026-03-08 | **기술 스택**: Vite + React 18 + TypeScript + Tailwind CSS v3 + framer-motion
+
+---
+
+## 1. 제품 개요
+
+**MusicBeatMax**는 128 BPM EDM 음악에 완벽히 동기화된 4키(D, F, J, K) 건반 리듬 게임이다.  
+Web Audio API 기반 고정밀 타이밍과 framer-motion 애니메이션을 결합하여 **지연(Lag) 없는 몰입형 리듬 게임 경험**을 제공한다.
+
+---
+
+## 2. 사용자 스토리보드 (User Flow)
+
+```
+[타이틀 화면]
+  → 사용자가 곡 선택 카드("EDM Drop Zone", 128 BPM) 확인
+  → Note Speed 슬라이더(1~5단계)로 난이도(낙하 속도) 설정
+  → [PLAY] 버튼 클릭
+
+[카운트다운]
+  → 3 → 2 → 1 → GO! 텍스트 framer-motion 펄스
+  → Web Audio API AudioContext 생성 후 오디오 재생 시작
+  → 첫 번째 노트가 targetTime 기준 레인 최상단에 스폰
+
+[게임 플레이]
+  → 노트가 상단 → 판정선(Judgment Line) 방향으로 낙하
+  → 플레이어 D/F/J/K 키 입력 → 키 누른 시각과 오디오 currentTime 비교
+    ├─ |Δt| ≤ 50ms  → "PERFECT!" (콤보 +1, 점수 +300)
+    ├─ |Δt| ≤ 150ms → "GOOD"     (콤보 +1, 점수 +100)
+    └─ |Δt| > 150ms → "MISS"     (콤보 리셋, 점수 +0)
+  → 콤보 10↑: 배경 Audio Visualizer 첫 활성화
+  → 콤보 30↑: 배경 이펙트 강도 2단계, 레인 글로우 증가
+  → 콤보 50↑: 최고 강도 이펙트, 화면 전체 파동(radial pulse)
+
+[결과 화면]
+  → 곡 종료 후 자동 전환
+  → 정확도%, PERFECT/GOOD/MISS 수, 최대 콤보, 총 점수 표시
+  → 랭크(S/A/B/C/D) 애니메이션으로 등장
+  → [RETRY] / [MENU] 버튼
+```
+
+---
+
+## 3. Stitch MCP 생성 UI 디자인
+
+> **프로젝트 ID**: `9844956170528425894`
+
+| 화면 | Screen ID |
+|------|-----------|
+| 게임 플레이 화면 | `d6d58ba0041141bdbc25bd3868e06a4b` |
+| 타이틀 / 곡 선택 화면 | `c88b96eb641049599c309e5438fa100c` |
+
+**게임 플레이 화면 미리보기:**
+![Gameplay UI](https://lh3.googleusercontent.com/aida/AOfcidU8KVzLpRR3W4MJUt0l_Y9xMSlRSE6sdnau0FcoGX7WtWaRFD56ESQO7OLzSjAeg2QYr_82ZNB5IFer0qL_iqIB5WHesDjeVtPiXoELSESrzS5L4n-QzHSE1Q1aq4l5dHkA0NAYFSIm8RHFaAgVWB50I5lePKRplP0D2u0dC4AxipldfjNDxJ6dCtVuh-XpE8IYfUDzRMfgfPvuKdWty0rOYqFju0rQiBbDKNWD75tpL63tCMnF7jTNGA)
+
+**타이틀 화면 미리보기:**
+![Title UI](https://lh3.googleusercontent.com/aida/AOfcidWoBYW5DNzW6VAZgTlklMxU6gD1LPkS-HHwaEWM08nLYAMmtnOf3c3eiao88PV90q6zqugGXEat-7yhufjukx3iXOntLqBx6kWlzeBYbPYYTMsH3VlYg0K-HEdCwprcjHS0Tk9KkLeR5cBjUYmb-wm_aZCtJ-dl2e0651egavtgxokOrbFEP1OB29MMAMP3t9kVgUNt9_qRfbITfIYvOwX17ZO1dUiKku0a959zDjCvQV6EO9A26aHYcuQ)
+
+---
+
+## 4. 디자인 시스템 & 토큰
+
+### 색상 팔레트
+| 역할 | 값 |
+|------|-----|
+| 배경 | `#06040f` (deep navy-black) |
+| 레인 D | `#00f0ff` Cyan |
+| 레인 F | `#39ff14` Neon Green |
+| 레인 J | `#ffe500` Yellow |
+| 레인 K | `#ff2d9b` Magenta |
+| 판정선 | `#ffffff` + glow `0 0 20px #fff` |
+| PERFECT | `#facc15` Gold |
+| GOOD | `#22c55e` Green |
+| MISS | `#ef4444` Red |
+
+### 타이포그래피
+- 폰트: **Space Grotesk** (Google Fonts)
+- 판정 텍스트: `text-6xl font-black tracking-tight`
+- 점수: `text-5xl font-mono font-bold`
+
+### 128 BPM 타이밍 기준값
+- 1박자: **468.75ms**
+- 판정선 Pulse 주기: `468.75ms`
+- PERFECT 이펙트 지속: `600ms`
+
+---
+
+## 5. FBM 기반 UX 원칙
+
+### Ability — 진입 장벽 낮추기
+- Note Speed 슬라이더: 1단계(3초 낙하) ~ 5단계(1초 낙하), 기본값 2단계
+- 첫 10초: 노트 밀도 50% 감소(튜토리얼 구간)
+- 낙하 전 0.5초: 레인 상단에 "예고 쉐도우" 노트 표시
+
+### Motivation — 몰입감 강화
+| 콤보 구간 | 효과 |
+|-----------|------|
+| 0~9 | 기본 상태 |
+| 10~29 | Visualizer bars 활성 (opacity 0.3) |
+| 30~49 | Visualizer 강도 ×2 + 레인 글로우 +20% |
+| 50+ | 전체 화면 파동(radial pulse) + 파티클 |
+
+### Trigger — 판정선 직관성
+- 판정선: 화면 하단 15% 위치, 높이 4px, 흰색 강한 glow
+- 키 입력 시: 해당 레인 전체 0.1s 플래시
+- PERFECT 시: `scale: [1, 1.6, 1]` + `opacity: [1, 1, 0]` 600ms
+
+---
+
+## 6. 비기능 요구사항
+
+| 항목 | 목표 |
+|------|------|
+| 노트 렌더링 지연 | < 16ms (60fps) |
+| 오디오↔시각 동기화 오차 | < ±10ms |
+| 키 입력 응답 | < 5ms |
+| 번들 크기 | < 300KB (gzip) |
+| 브라우저 지원 | Chrome 110+, Firefox 115+, Edge 110+ |
