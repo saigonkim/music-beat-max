@@ -5,6 +5,9 @@ import { LANE_KEYS, NOTE_SPEED_LEVELS } from '../../game/constants'
 import { audioEngine } from '../../audio/AudioEngine'
 import { generateNoteChart, parseChartScript, type ChartSegment } from '../../game/noteChart'
 import { ordinaryDaysWithYouScript } from '../../game/charts/ordinaryDaysWithYou'
+import { RecordsModal } from './RecordsModal'
+import { auth } from '../../lib/firebase'
+import { onAuthStateChanged, User } from 'firebase/auth'
 
 // ============================================================
 // TitleScreen — 타이틀 및 곡 선택 화면 (Stitch 디자인 기반)
@@ -49,16 +52,28 @@ export const AVAILABLE_SONGS: SongMetadata[] = [
 ]
 
 export function TitleScreen() {
-    const { speedLevel, setSpeedLevel, setScene, setNotes, audioOffset, setAudioOffset } = useGameStore()
+    const { speedLevel, setSpeedLevel, setScene, setNotes, audioOffset, setAudioOffset, setCurrentSongId, setCurrentBpm } = useGameStore()
     const [selectedSongIdx, setSelectedSongIdx] = useState(0)
     const [isLoading, setIsLoading] = useState(false)
+    const [isRecordsOpen, setIsRecordsOpen] = useState(false)
+    const [user, setUser] = useState<User | null>(null)
+
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+            setUser(currentUser)
+        })
+        return () => unsubscribe()
+    }, [])
 
     const selectedSong = AVAILABLE_SONGS[selectedSongIdx]
 
-    // 초기 마운트 시 기본 선택된 곡의 오프셋을 게임 스토어에 동기화
+    // 초기 마운트 시 및 곡 변경 시 기본 선택된 곡의 오프셋을 게임 스토어에 동기화
+    // 모바일 기기는 보통 오디오 레이턴시가 100~200ms 더 크므로, 추가로 -100ms 딜레이를 보정.
     useEffect(() => {
-        setAudioOffset(AVAILABLE_SONGS[selectedSongIdx].offset ?? 0)
-    }, [])
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+        const baseOffset = AVAILABLE_SONGS[selectedSongIdx].offset ?? 0
+        setAudioOffset(isMobile ? baseOffset - 0.1 : baseOffset)
+    }, [selectedSongIdx, setAudioOffset])
 
     const startGame = useCallback(async () => {
         if (isLoading) return
@@ -84,7 +99,8 @@ export function TitleScreen() {
             setNotes(chart)
 
             // 전역 스토어에 BPM 저장 (게임 화면에서 표시용)
-            useGameStore.getState().setCurrentBpm(selectedSong.bpm)
+            setCurrentBpm(selectedSong.bpm)
+            setCurrentSongId(selectedSong.id)
 
             // 3. 바로 게임 화면으로 이동
             setScene('game')
@@ -94,7 +110,7 @@ export function TitleScreen() {
         } finally {
             setIsLoading(false)
         }
-    }, [selectedSong, isLoading, setNotes, setScene])
+    }, [selectedSong, isLoading, setNotes, setScene, setCurrentSongId, setCurrentBpm])
 
     const speedMs = NOTE_SPEED_LEVELS[speedLevel]
     const speedLabels = ['★☆☆☆☆', '★★☆☆☆', '★★★☆☆', '★★★★☆', '★★★★★']
@@ -103,6 +119,19 @@ export function TitleScreen() {
         <div className="relative flex h-[100dvh] w-full flex-col items-center justify-center overflow-hidden bg-game-bg px-4">
             {/* Animated background waveform */}
             <BackgroundWave />
+
+            {/* My Records Button */}
+            <div className="absolute top-4 right-4 z-10">
+                <button
+                    onClick={() => setIsRecordsOpen(true)}
+                    className="rounded-xl border border-white/20 bg-white/5 px-4 py-2 text-sm font-bold text-white shadow-lg backdrop-blur-md transition-all hover:bg-white/20 hover:scale-105 active:scale-95 flex items-center gap-2"
+                >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                    </svg>
+                    My Records
+                </button>
+            </div>
 
             {/* Logo */}
             <motion.div
@@ -137,10 +166,7 @@ export function TitleScreen() {
                 {AVAILABLE_SONGS.map((song, idx) => (
                     <div
                         key={song.id}
-                        onClick={() => {
-                            setSelectedSongIdx(idx)
-                            setAudioOffset(song.offset ?? 0) // 곡을 선택할 때 전용 디폴트 오프셋 알아서 세팅
-                        }}
+                        onClick={() => setSelectedSongIdx(idx)}
                         className={`flex gap-4 rounded-2xl border p-4 backdrop-blur-md cursor-pointer transition-all ${idx === selectedSongIdx
                             ? 'border-neon-cyan bg-white/10 shadow-[0_0_15px_rgba(0,240,255,0.3)]'
                             : 'border-white/10 bg-white/5 hover:bg-white/10'
@@ -275,6 +301,12 @@ export function TitleScreen() {
             >
                 {isLoading ? 'LOADING...' : 'PLAY'}
             </motion.button>
+
+            <RecordsModal
+                isOpen={isRecordsOpen}
+                onClose={() => setIsRecordsOpen(false)}
+                user={user}
+            />
         </div>
     )
 }

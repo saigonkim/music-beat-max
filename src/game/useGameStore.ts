@@ -21,6 +21,9 @@ interface GameStore {
     currentBpm: number
     setCurrentBpm: (bpm: number) => void
 
+    currentSongId: string
+    setCurrentSongId: (id: string) => void
+
     // ── Audio ──────────────────────────────
     audioTime: number
     setAudioTime: (t: number) => void
@@ -69,6 +72,7 @@ const calcComboTier = (combo: number): ComboTier => {
 const initState = {
     scene: 'title' as Scene,
     currentBpm: 128,
+    currentSongId: '',
     audioTime: 0,
     notes: [] as Note[],
     initialNotes: [] as Note[],
@@ -94,6 +98,7 @@ export const useGameStore = create<GameStore>()(
 
         setScene: (scene) => set({ scene }),
         setCurrentBpm: (bpm) => set({ currentBpm: bpm }),
+        setCurrentSongId: (id) => set({ currentSongId: id }),
 
         setAudioTime: (audioTime) => set({ audioTime }),
 
@@ -205,6 +210,7 @@ export const useGameStore = create<GameStore>()(
                 noteDropMs: state.noteDropMs,
                 audioOffset: state.audioOffset,
                 currentBpm: state.currentBpm,
+                currentSongId: state.currentSongId,
                 initialNotes: state.initialNotes, // 재시작을 위해 초기 노트 백업본 유지
             })),
 

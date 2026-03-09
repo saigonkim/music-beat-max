@@ -2,8 +2,9 @@ import { useCallback, useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useGameStore } from '../../game/useGameStore'
 import { useCountUp } from '../../hooks/useCountUp'
-import { auth, signInWithGoogle } from '../../lib/firebase'
+import { auth, signInWithGoogle, db } from '../../lib/firebase'
 import { onAuthStateChanged, User } from 'firebase/auth'
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore'
 
 // ============================================================
 // ResultScreen — 게임 결과 화면
@@ -18,12 +19,13 @@ const RANK_THRESHOLDS = [
 ]
 
 export function ResultScreen() {
-    const { getStats, resetGame, setScene } = useGameStore()
+    const { getStats, resetGame, setScene, currentSongId } = useGameStore()
     const stats = getStats()
 
     const rank = RANK_THRESHOLDS.find((r) => stats.accuracy >= r.minAccuracy)!
 
     const [user, setUser] = useState<User | null>(null)
+    const [hasSaved, setHasSaved] = useState(false)
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -31,6 +33,32 @@ export function ResultScreen() {
         })
         return () => unsubscribe()
     }, [])
+
+    useEffect(() => {
+        const saveScore = async () => {
+            if (user && !hasSaved && stats.score > 0) {
+                try {
+                    setHasSaved(true)
+                    await addDoc(collection(db, 'user_records'), {
+                        uid: user.uid,
+                        displayName: user.displayName || 'Anonymous',
+                        songId: currentSongId || 'unknown',
+                        score: stats.score,
+                        accuracy: stats.accuracy,
+                        maxCombo: stats.maxCombo,
+                        perfect: stats.perfect,
+                        good: stats.good,
+                        miss: stats.miss,
+                        createdAt: serverTimestamp()
+                    })
+                } catch (e) {
+                    console.error('Error saving score', e)
+                    setHasSaved(false)
+                }
+            }
+        }
+        saveScore()
+    }, [user, hasSaved, stats.score, stats.accuracy, stats.maxCombo, stats.perfect, stats.good, stats.miss, currentSongId])
 
     const handleGoogleLogin = async () => {
         try {

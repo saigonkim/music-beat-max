@@ -151,8 +151,14 @@ export function GameScreen() {
 
             {/* Bottom key indicators */}
             <div
-                className="absolute bottom-4 flex gap-4 z-50 touch-none select-none"
-                style={{ left: '50%', transform: 'translateX(-50%)' }}
+                className="absolute flex z-50 touch-none select-none"
+                style={{
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    bottom: 0,
+                    width: GAME_WIDTH,
+                    height: GAME_HEIGHT * (1 - JUDGMENT_LINE_PCT)
+                }}
             >
                 {(['D', 'F', 'J', 'K'] as const).map((label, i) => {
                     const active = laneFlash[i]
@@ -163,13 +169,15 @@ export function GameScreen() {
                                 e.preventDefault() // 브라우저 기본 터치/스크롤 방지
                                 handleHit(i as LaneIndex)
                             }}
-                            className="flex h-16 w-16 cursor-pointer items-center justify-center rounded-xl border-2 text-xl font-black uppercase transition-all shadow-lg active:scale-90"
+                            className="flex cursor-pointer items-center justify-center text-xl font-black uppercase transition-all shadow-lg active:brightness-150"
                             style={{
-                                borderColor: LANE_COLORS[i as LaneIndex],
+                                width: LANE_WIDTH,
+                                height: '100%',
+                                borderTop: `2px solid ${LANE_COLORS[i as LaneIndex]}`,
+                                borderRight: i < 3 ? '1px solid rgba(255,255,255,0.1)' : 'none',
                                 color: active ? '#fff' : LANE_COLORS[i as LaneIndex],
-                                backgroundColor: active ? `${LANE_COLORS[i as LaneIndex]}` : 'rgba(255,255,255,0.05)',
-                                boxShadow: active ? `0 0 20px 8px ${LANE_COLORS[i as LaneIndex]}80` : 'none',
-                                transform: active ? 'scale(0.9)' : 'scale(1)',
+                                backgroundColor: active ? `${LANE_COLORS[i as LaneIndex]}33` : 'rgba(255,255,255,0.02)',
+                                boxShadow: active ? `inset 0 0 30px ${LANE_COLORS[i as LaneIndex]}` : 'none',
                             }}
                         >
                             {label}
