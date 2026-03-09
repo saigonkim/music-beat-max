@@ -70,7 +70,8 @@ export function GameScreen() {
 
     // 터치 입력 핸들러 추가
     const handleHit = useCallback((lane: LaneIndex) => {
-        pressKey(lane, audioEngine.currentTime)
+        const offset = useGameStore.getState().audioOffset
+        pressKey(lane, audioEngine.currentTime - offset)
     }, [pressKey])
 
     // 콤보 등급별 배경 강도
